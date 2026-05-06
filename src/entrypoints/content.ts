@@ -14,9 +14,13 @@ export default defineContentScript({
 
       if (message.type === 'APPLY_FIELD') {
         const { selector, value, shadowHost, fieldType } = message;
-        const result = applyField({ selector, value: '', shadowHost, fieldType, fieldLabel: '', currentValue: '', context: '' }, value);
-        sendResponse(result);
-        return false;
+        applyField(
+          { selector, value: '', shadowHost, fieldType, fieldLabel: '', currentValue: '', context: '' },
+          value
+        )
+          .then(result => sendResponse(result))
+          .catch(err => sendResponse({ ok: false, error: String(err) }));
+        return true; // async response — keep channel open
       }
     });
   },
