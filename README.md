@@ -81,6 +81,19 @@ src/
 
 Your profile and API key are stored locally in `browser.storage.local`. The only outbound request is to the Anthropic API when you click Fill Page.
 
+## Changelog
+
+### v0.2.0 — 2026-05-05
+
+**Fixed:** ARIA combobox fields (used by Airtable, Notion, and other React-based form builders) now fill correctly. Previously, all fields on forms like Pear VC's PearX application would be skipped because the extension called `HTMLSelectElement.options` on a div with `role="combobox"`, throwing a silent TypeError that prevented any response from being sent back. The fix adds a proper `fillCombobox` handler that first checks for a real `<input>` child (used by text fields wrapped in combobox for accessibility), then falls back to click-to-open the dropdown and click the matching option. Error handling in the content script is also hardened — exceptions now always return a structured error response instead of silently timing out.
+
+### v0.1.0 — Initial release
+
+- Field detection across all frames including shadow DOM and cross-origin iframes
+- Job and Accelerator fill modes
+- Claude Opus 4.7 answers with word/character limit awareness
+- Safari and Chrome support via WXT
+
 ## License
 
 MIT
