@@ -51,11 +51,48 @@ function fillSelect(el: HTMLSelectElement, answer: string): boolean {
   return false;
 }
 
+// Handles ARIA combobox widgets (role="combobox" on a div).
+// Strategy 1: if there's a real text input inside, fill it directly.
+// Strategy 2: click to open the listbox, then click the matching option.
+async function fillCombobox(el: Element, answer: string): Promise<boolean> {
+  const inner = el.querySelector<HTMLInputElement>('input:not([type="hidden"]):not([disabled])');
+  if (inner) {
+    fillText(inner, answer);
+    return true;
+  }
+
+  (el as HTMLElement).click();
+  await new Promise<void>(r => setTimeout(r, 350));
+
+  const listboxId = el.getAttribute('aria-controls') ?? el.getAttribute('aria-owns');
+  const listbox: Element | null = listboxId
+    ? document.getElementById(listboxId)
+    : (el.closest('[role="group"]') ?? el.parentElement)?.querySelector('[role="listbox"]') ?? null;
+
+  if (!listbox) {
+    document.body.click();
+    return false;
+  }
+
+  const norm = (s: string) => s.trim().toLowerCase();
+  const options = Array.from(listbox.querySelectorAll<Element>('[role="option"]'));
+  const match = options.find(o => norm(o.textContent ?? '') === norm(answer))
+    ?? options.find(o => norm(o.textContent ?? '').includes(norm(answer)));
+
+  if (match) {
+    (match as HTMLElement).click();
+    return true;
+  }
+
+  document.body.click();
+  return false;
+}
+
 export type FillResult =
   | { ok: true }
   | { ok: false; error: string };
 
-export function applyField(field: DetectedField, value: string): FillResult {
+export async function applyField(field: DetectedField, value: string): Promise<FillResult> {
   const root: Document | ShadowRoot = field.shadowHost
     ? (() => {
         const host = document.querySelector(field.shadowHost);
@@ -82,11 +119,19 @@ export function applyField(field: DetectedField, value: string): FillResult {
       return { ok: true };
 
     case 'select': {
-      const matched = fillSelect(el as HTMLSelectElement, value);
+      if (el instanceof HTMLSelectElement) {
+        const matched = fillSelect(el, value);
+        if (!matched) {
+          (el as HTMLElement).style.outline = '2px solid #f59e0b';
+          return { ok: false, error: `No option matched "${value}" — manual fill needed` };
+        }
+        return { ok: true };
+      }
+      // ARIA combobox (div with role="combobox")
+      const matched = await fillCombobox(el, value);
       if (!matched) {
-        // Visual signal for manual fix
         (el as HTMLElement).style.outline = '2px solid #f59e0b';
-        return { ok: false, error: `No option matched "${value}" — manual fill needed` };
+        return { ok: false, error: `No option matched "${value}" in combobox — manual fill needed` };
       }
       return { ok: true };
     }
